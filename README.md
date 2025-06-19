@@ -1,6 +1,4 @@
 ##### Process injector level 0
-> gcc .\injector.cpp -o injector.exe
-
 les shellcodes sont obtenu avec : 
 ```
 64 bit Shellcode : msfvenom --platform windows -p windows/x64/messagebox TEXT="Injected by Rida" TITLE="Pwned" EXITFUNC=thread -f c
@@ -9,5 +7,18 @@ les shellcodes sont obtenu avec :
 
 POC : 
 
-![image](assets/POC_process_injector.png)
+![image](assets/POC_plvl_0.png)
 
+Detection: 
+
+![alt text](assets/detect_lvl_0.png)
+
+##### Process injector level 1
+> Import dynamique et XOR des noms de fonctions et shellcodes
+
+POC : 
+![image](assets/POC_lvl_1.png)
+
+Detection : 
+
+![image](assets/detect_lvl_1.png)
