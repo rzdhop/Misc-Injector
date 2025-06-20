@@ -1,3 +1,5 @@
+> CE PROJET EST À VOCATION PUREMENT ÉDUCATIVE. Il est nécessaire de comprendre les malwares pour pouvoir les analyser (reverser), c'est donc dans cette mentalité que j'ai décidé de créer mon propre malware de plus en plus complexe et non détectable.
+
 ##### Process injector level 0
 les shellcodes sont obtenu avec : 
 ```
@@ -17,6 +19,7 @@ Detection:
 > Import dynamique et XOR des noms de fonctions et shellcodes
 
 POC : 
+
 ![image](assets/POC_lvl_1.png)
 
 Detection : 
