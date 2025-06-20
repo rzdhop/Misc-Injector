@@ -25,3 +25,6 @@ POC :
 Detection : 
 
 ![image](assets/detect_lvl_1.png)
+
+
+📄 Voir [EULA.md](./EULA.md) pour les conditions d'utilisation.
