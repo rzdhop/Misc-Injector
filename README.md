@@ -38,7 +38,7 @@ POC :
 
 Detection : 
 
-![alt text](assets/detection_lvl_2.png)
+![alt text](assets/detect_lvl_2.png)
 
 ##### DLL injector level 0
 POC : 
