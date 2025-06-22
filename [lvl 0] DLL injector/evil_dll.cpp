@@ -1,6 +1,11 @@
 //#include "pch.h"
 #include <windows.h>
 
+/*
+Compile w/ gcc -shared -o evil_dll.dll evil_dll.cpp -Wall -mwindows
+*/
+
+
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserved) {
     switch (ul_reason_for_call)
     {
@@ -19,4 +24,5 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
         default:
             break;
     }
+    return true;
 }

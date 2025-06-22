@@ -1,5 +1,7 @@
 > CE PROJET EST À VOCATION PUREMENT ÉDUCATIVE. Il est nécessaire de comprendre les malwares pour pouvoir les analyser (reverser), c'est donc dans cette mentalité que j'ai décidé de créer mon propre malware de plus en plus complexe et non détectable.
 
+📄 Voir [EULA.md](./EULA.md) pour les conditions d'utilisation.
+
 ##### Process injector level 0
 les shellcodes sont obtenu avec : 
 ```
@@ -26,5 +28,24 @@ Detection :
 
 ![image](assets/detect_lvl_1.png)
 
+##### Process injector level 2
+> Imports dynamisque obfusqué sur plus de fonctions, detection basique de VM + Debugger
+> implementation d'une techique de faire grossire le process en mémoire pour timeout les AVs
 
-📄 Voir [EULA.md](./EULA.md) pour les conditions d'utilisation.
+POC :
+
+![image](assets/POC_lvl_2.png)
+
+Detection : 
+
+![alt text](assets/detection_lvl_2.png)
+
+##### DLL injector level 0
+POC : 
+
+![image](assets/POC_DLL_lvl_0.png)
+
+Detection : 
+Bon ça sert a rien c'est niveau 0
+
+
