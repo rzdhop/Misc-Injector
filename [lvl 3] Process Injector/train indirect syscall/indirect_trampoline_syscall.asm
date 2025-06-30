@@ -6,7 +6,7 @@ global stubNtCreateThreadEx
 section .text
 
 stubNtCreateThreadEx:
-    mov     r10, rcx        ; r10 : adresse syscall (stub+0x12)
+    mov     r10, rcx       
     mov     eax, [g_SSN_NtCreateThreadEx]        ; eax : SSN
-    jmp [g_Stub_NtCreateThreadEx]
-    ret
+    jmp [g_Stub_NtCreateThreadEx]                ; jmp to syscall instruction
+    ret 

