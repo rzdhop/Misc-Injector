@@ -30,7 +30,8 @@ Detection :
 
 ##### Process injector level 2
 > Imports dynamisque obfusqué sur plus de fonctions, detection basique de VM + Debugger
-> implementation d'une techique de faire grossire le process en mémoire pour timeout les AVs
+
+> implementation d'une techique de faire grossir le process en mémoire pour timeout les AVs
 
 POC :
 
@@ -39,6 +40,25 @@ POC :
 Detection : 
 
 ![alt text](assets/detect_lvl_2.png)
+
+
+##### Process injector level 3
+> Imports dynamisque obfusqué sur plus de fonctions, detection basique de VM + Debugger
+
+> implementation d'une techique de faire grossir le process en mémoire pour timeout les AVs
+
+> Indirect Syscall (ntdll trampoline)
+
+> TODO : custom GetProcAddr + Clean le code haha
+
+POC : 
+
+![image](assets/POC_lvl_3.png)
+
+Detection (Sans Custom GetProcAddress)
+
+![aimage](assets/detect_lvl_3.png)
+
 
 ##### DLL injector level 0
 POC : 
