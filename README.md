@@ -47,9 +47,9 @@ Detection :
 
 > implementation d'une techique de faire grossir le process en mémoire pour timeout les AVs
 
-> Indirect Syscall (ntdll trampoline)
+> Indirect Syscall (ntdll trampoline) (obfuscation avec insruction parasites)
 
-> TODO : custom GetProcAddr + Clean le code haha
+> custom GetProcAddress
 
 POC : 
 
@@ -59,6 +59,14 @@ Detection (Sans Custom GetProcAddress)
 
 ![aimage](assets/detect_lvl_3.png)
 
+##### Process injector level 4
+> Binary signing using Digicert/leaked certificates or Openssl 
+
+- `openssl req -x509 -newkey rsa:4096 -keyout malkey.pem -out malcert.pem -sha256 -days 365`
+- `openssl pkcs12 -inkey key.pem -in cert.pem -export -out sign.pfx`
+- `signtool sign /f sign.pfx /p <pfx-password> /t http://timestamp.digicert.com /fd sha256 binary.exe`
+
+> 
 
 ##### DLL injector level 0
 POC : 
