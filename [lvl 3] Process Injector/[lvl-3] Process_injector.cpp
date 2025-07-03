@@ -55,13 +55,17 @@ FARPROC __stdcall MyGetProcAddress(HMODULE hModule, LPCSTR lpProcName) {
 
     //Cast DOS header
     PIMAGE_DOS_HEADER pImgDosHdr = (PIMAGE_DOS_HEADER)pBase;
-    if (pImgDosHdr->e_magic != IMAGE_DOS_SIGNATURE)
+    if (pImgDosHdr->e_magic != IMAGE_DOS_SIGNATURE){
+        printf("[-] Erreur de recuperation du DOS Header\n");
 		return NULL;
+    }
 
     //Get NTHeader ptr from DOS header
     PIMAGE_NT_HEADERS pImgNtHdrs = (PIMAGE_NT_HEADERS)(pBase + pImgDosHdr->e_lfanew);
-	if (pImgNtHdrs->Signature != IMAGE_NT_SIGNATURE)
-		return NULL;
+	if (pImgNtHdrs->Signature != IMAGE_NT_SIGNATURE) {
+		printf("[-] Erreur de recuperation du NtHeader\n");
+        return NULL;
+    }
 
     //Get Optionalheader for NTHeader
     IMAGE_OPTIONAL_HEADER ImgOptHdr = pImgNtHdrs->OptionalHeader;
@@ -88,7 +92,7 @@ FARPROC __stdcall MyGetProcAddress(HMODULE hModule, LPCSTR lpProcName) {
 
     for (DWORD i = 0; i < pImgExportDir->NumberOfFunctions; i++){
         CHAR* pFunctionName = (CHAR*)(pBase + FunctionNameArray[i]);
-        if (memcmp(pFunctionName, lpProcName, sizeof(lpProcName))) {
+        if (strcmp(lpProcName, pFunctionName) == 0) {
             WORD wFunctionOrdinal = FunctionOrdinalArray[i];
             PVOID pFunctionAddress = (PVOID)(pBase + FunctionAddressArray[wFunctionOrdinal]);
             return (FARPROC)pFunctionAddress;
