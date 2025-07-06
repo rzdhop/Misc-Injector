@@ -3,7 +3,7 @@
 📄 Voir [EULA.md](./EULA.md) pour les conditions d'utilisation.
 
 ##### Process injector level 0
-les shellcodes sont obtenu avec : 
+Les shellcodes sont obtenus avec : 
 ```
 64 bit Shellcode : msfvenom --platform windows -p windows/x64/messagebox TEXT="Injected by Rida" TITLE="Pwned" EXITFUNC=thread -f c
 32 bit shellcode : msfvenom -p windows/messagebox -a x86 --platform windows TEXT="Injected by Rida" TITLE="Pwned" EXITFUNC=thread -f c
@@ -13,49 +13,47 @@ POC :
 
 ![image](assets/POC_lvl_0.png)
 
-Detection: 
+Détection: 
 
 ![alt text](assets/detect_lvl_0.png)
 
 ##### Process injector level 1
-> Import dynamique et XOR des noms de fonctions et shellcodes
+> Import dynamique et obfuscation XOR des noms de fonctions et du shellcode
 
 POC : 
 
 ![image](assets/POC_lvl_1.png)
 
-Detection : 
+Détection : 
 
 ![image](assets/detect_lvl_1.png)
 
 ##### Process injector level 2
-> Imports dynamisque obfusqué sur plus de fonctions, detection basique de VM + Debugger
+> Imports dynamiques obfusqués étendus à d'autres fonctions, détection basique de VM et de debugger
 
-> implementation d'une techique de faire grossir le process en mémoire pour timeout les AVs
+> Implémentation d'une technique pour faire grossir le process en mémoire afin de faire timeout certains AV
 
 POC :
 
 ![image](assets/POC_lvl_2.png)
 
-Detection : 
+Détection : 
 
 ![alt text](assets/detect_lvl_2.png)
 
 
 ##### Process injector level 3
-> Imports dynamisque obfusqué sur plus de fonctions, detection basique de VM + Debugger
+> Même base que le niveau 2
 
-> implementation d'une techique de faire grossir le process en mémoire pour timeout les AVs
+> Indirect syscalls (via trampoline ntdll) avec obfuscation via instructions parasites
 
-> Indirect Syscall (ntdll trampoline) (obfuscation avec insruction parasites)
-
-> custom GetProcAddress
+> Implémentation d’un GetProcAddress custom
 
 POC : 
 
 ![image](assets/POC_lvl_3.png)
 
-Detection
+Détection
 
 ![image](assets/detect_lvl_3.png)
 
@@ -63,19 +61,21 @@ Detection
 > Binary signing using Digicert/leaked certificates or Openssl 
 
 - `openssl req -x509 -newkey rsa:4096 -keyout malkey.pem -out malcert.pem -sha256 -days 365`
-- `openssl pkcs12 -inkey malkey.pem -in malcert.pem -export -out sign.pfx`
-- `signtool sign /f sign.pfx /p <pfx-password> /t http://timestamp.digicert.com /fd sha256 injector.exe.exe`
+- `openssl pkcs12 -inkey malkey.pem -in malcert.pem -export -out malsign.pfx`
+- `signtool sign /f malsign.pfx /p <pfx-password> /t http://timestamp.digicert.com /fd sha256 injector.exe`
 
-Detection : 
+Détection : 
 
 ![image](assets/detect_lvl_4.png)
+
+> https://www.virustotal.com/gui/file/8653538acf96b3e73028953b26c14d1921b938ffc646aea406c9911a4466b46a/detection
 
 ##### DLL injector level 0
 POC : 
 
 ![image](assets/POC_DLL_lvl_0.png)
 
-Detection : 
+Détection : 
 Bon ça sert a rien c'est niveau 0
 
 
