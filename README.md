@@ -55,18 +55,20 @@ POC :
 
 ![image](assets/POC_lvl_3.png)
 
-Detection (Sans Custom GetProcAddress)
+Detection
 
-![aimage](assets/detect_lvl_3.png)
+![image](assets/detect_lvl_3.png)
 
 ##### Process injector level 4
 > Binary signing using Digicert/leaked certificates or Openssl 
 
 - `openssl req -x509 -newkey rsa:4096 -keyout malkey.pem -out malcert.pem -sha256 -days 365`
-- `openssl pkcs12 -inkey key.pem -in cert.pem -export -out sign.pfx`
-- `signtool sign /f sign.pfx /p <pfx-password> /t http://timestamp.digicert.com /fd sha256 binary.exe`
+- `openssl pkcs12 -inkey malkey.pem -in malcert.pem -export -out sign.pfx`
+- `signtool sign /f sign.pfx /p <pfx-password> /t http://timestamp.digicert.com /fd sha256 injector.exe.exe`
 
-> 
+Detection : 
+
+![image](assets/detect_lvl_4.png)
 
 ##### DLL injector level 0
 POC : 
