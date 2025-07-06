@@ -2,7 +2,7 @@
 #include <stdio.h>
 
 /*
-Pas encore implémenter, passez votres chemin...
+Pas encore implémenté, passez votre chemin...
 
 */
 void APCinjection(){
