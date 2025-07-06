@@ -1,7 +1,10 @@
 #include <windows.h> 
 #include <stdio.h>
 
+/*
+Pas encore implémenter, passez votres chemin...
 
+*/
 void APCinjection(){
 
 }
