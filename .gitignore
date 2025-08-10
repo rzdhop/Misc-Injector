@@ -1,3 +1,4 @@
 injector.exe
 *.dll
 *.exe
+.vscode/settings.json
